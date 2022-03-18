@@ -197,6 +197,7 @@ static void CheckRequiredAndSetDefault() {
       exit(-1);
     }
     iter->second.SetDefaultValue();
+    iter++;
   }
 }
 
