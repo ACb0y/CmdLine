@@ -2,12 +2,15 @@
 // Created by ACb0y on 2022/3/18.
 //
 
-#include <stdio.h>
+#include "CmdLine.h"
 #include <iostream>
-#include "flag.h"
+#include <stdio.h>
 
 std::string type;
+std::string name;
 int64_t len;
+int64_t age;
+bool flag;
 
 void usage() {
   std::cout << "usage " << std::endl;
@@ -15,12 +18,19 @@ void usage() {
 
 int main(int argc, char * argv[]) {
 
-  MyFlag::Int64Var(&len, "len", 10);
-  MyFlag::StringVar(&type, "type", "test");
-  MyFlag::SetUsage(usage);
-  MyFlag::Parse(argc,argv);
+  CmdLine::BoolOpt(&flag, "flag");
+  CmdLine::Int64Opt(&len, "len", 10);
+  CmdLine::StrOpt(&type, "type", "test");
+  CmdLine::StrOptRequired(&name, "name");
+  CmdLine::Int64OptRequired(&age, "age");
+  CmdLine::SetUsage(usage);
+  CmdLine::Parse(argc,argv);
+  
   std::cout << "type = " << type << std::endl;
   std::cout << "len = " << len << std::endl;
+  std::cout << "flag = " << flag << std::endl;
+  std::cout << "name = " << name << std::endl;
+  std::cout << "age = " << age << std::endl;
 
   return 0;
 }

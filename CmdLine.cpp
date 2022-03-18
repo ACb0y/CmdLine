@@ -2,13 +2,13 @@
 // Created by ACb0y on 2022/3/14.
 //
 
+#include "CmdLine.h"
+#include <map>
 #include <stdint.h>
 #include <stdio.h>
-#include <map>
 #include <string>
-#include "flag.h"
 
-namespace MyFlag {
+namespace CmdLine {
 
 enum CommandLineOptType {
   INT64_T = 1,
@@ -36,7 +36,8 @@ public:
     this->type = BOOL;
     this->name = name;
     this->value = (void *)value;
-    this->isSet = false;
+    this->isValueSet = false;
+    this->isOptSet = false;
     this->required = required;
     this->defaultValue.boolValue = defaultValue;
   }
@@ -44,7 +45,8 @@ public:
     this->type = INT64_T;
     this->name = name;
     this->value = (void *)value;
-    this->isSet = false;
+    this->isValueSet = false;
+    this->isOptSet = false;
     this->required = required;
     this->defaultValue.int64Value = defaultValue;
   }
@@ -52,15 +54,19 @@ public:
     this->type = STRING;
     this->name = name;
     this->value = (void *)value;
-    this->isSet = false;
+    this->isValueSet = false;
+    this->isOptSet = false;
     this->required = required;
     this->defaultValue.stringValue = defaultValue;
   }
   bool IsBoolOpt() {
     return type == BOOL;
   }
+  void SetOptIsSet() {
+    isOptSet = true;
+  }
   void SetBoolValue(bool value) {
-    this->isSet = true;
+    this->isValueSet = true;
     *(bool*)this->value = value;
   }
   void SetValue(std::string value) {
@@ -70,20 +76,24 @@ public:
     if (this->type == INT64_T) {
       *(int64_t*)this->value = atoll(value.c_str());
     }
-    this->isSet = true;
+    this->isValueSet = true;
   }
   bool CheckRequired() {
     if (!required) {
       return true;
     }
-    if (required && isSet) {
+    if (required && isValueSet) {
       return true;
     }
-    printf("option %s not set argument\n", name.c_str());
+    if (not isOptSet) {
+      printf("%s is required but not set\n", name.c_str());
+      return false;
+    }
+    printf("required option %s not set argument\n", name.c_str());
     return false;
   }
   void SetDefaultValue() {
-    if (isSet) {
+    if (isValueSet) {
       return;
     }
     if (type == BOOL) {
@@ -101,7 +111,8 @@ private:
   CommandLineOptType type;
   std::string name;
   void * value;
-  bool isSet;
+  bool isValueSet;
+  bool isOptSet;
   bool required;
   CommandLineOptDefaultValue defaultValue;
 };
@@ -171,17 +182,21 @@ static ParseOptResult ParseOpt(int argc, char * argv[], int &parseIndex) {
     printf("option provided but not defined: -%s\n", optName.c_str());
     return FAIL;
   }
-
+  iter->second.SetOptIsSet();
   if (iter->second.IsBoolOpt()) { // 不需要参数的bool类型选项
     iter->second.SetBoolValue(true);
     parseIndex++; // parseIndex跳到下一个选项
   } else { // 需要参数的选项，参数可能在下一个命令行参数中
-    if (!hasArgument && parseIndex + 1 < argc) { // 选项的值在下一个命令行参数
-      hasArgument = true;
-      argument = std::string(argv[parseIndex + 1]);
-      parseIndex += 2; // parseIndex跳到下一个选项
+    if (hasArgument) {
+      parseIndex++;
+    } else {
+      if (parseIndex + 1 < argc) { // 选项的值在下一个命令行参数
+        hasArgument = true;
+        argument = std::string(argv[parseIndex + 1]);
+        parseIndex += 2; // parseIndex跳到下一个选项
+      }
     }
-    if (!hasArgument) {
+    if (not hasArgument) {
       printf("option needs an argument: -%s\n", optName.c_str());
       return FAIL;
     }
@@ -201,7 +216,19 @@ static void CheckRequiredAndSetDefault() {
   }
 }
 
-void BoolVar(bool* value, std::string name, bool defaultValue) {
+void BoolOpt(bool* value, std::string name) {
+  if (_opts.find(name) != _opts.end()) {
+    printf("%s opt already set\n", name.c_str());
+    exit(-1);
+  }
+  if (isInvalidName(name)) {
+    printf("%s is invalid name\n", name.c_str());
+    exit(-2);
+  }
+  _opts[name] = CommandLineOpt(value, name, false, false);
+}
+
+void Int64Opt(int64_t* value, std::string name, int64_t defaultValue) {
   if (_opts.find(name) != _opts.end()) {
     printf("%s opt already set\n", name.c_str());
     exit(-1);
@@ -213,7 +240,7 @@ void BoolVar(bool* value, std::string name, bool defaultValue) {
   _opts[name] = CommandLineOpt(value, name, defaultValue, false);
 }
 
-void Int64Var(int64_t* value, std::string name, int64_t defaultValue, bool required) {
+void StrOpt(std::string* value, std::string name, std::string defaultValue) {
   if (_opts.find(name) != _opts.end()) {
     printf("%s opt already set\n", name.c_str());
     exit(-1);
@@ -222,10 +249,10 @@ void Int64Var(int64_t* value, std::string name, int64_t defaultValue, bool requi
     printf("%s is invalid name\n", name.c_str());
     exit(-2);
   }
-  _opts[name] = CommandLineOpt(value, name, defaultValue, required);
+  _opts[name] = CommandLineOpt(value, name, defaultValue, false);
 }
 
-void StringVar(std::string* value, std::string name, std::string defaultValue, bool required) {
+void Int64OptRequired(int64_t* value, std::string name) {
   if (_opts.find(name) != _opts.end()) {
     printf("%s opt already set\n", name.c_str());
     exit(-1);
@@ -234,7 +261,19 @@ void StringVar(std::string* value, std::string name, std::string defaultValue, b
     printf("%s is invalid name\n", name.c_str());
     exit(-2);
   }
-  _opts[name] = CommandLineOpt(value, name, defaultValue, required);
+  _opts[name] = CommandLineOpt(value, name, 0, true);
+}
+
+void StrOptRequired(std::string* value, std::string name) {
+  if (_opts.find(name) != _opts.end()) {
+    printf("%s opt already set\n", name.c_str());
+    exit(-1);
+  }
+  if (isInvalidName(name)) {
+    printf("%s is invalid name\n", name.c_str());
+    exit(-2);
+  }
+  _opts[name] = CommandLineOpt(value, name, "", true);
 }
 
 void SetUsage(Usage usage) {
