@@ -143,7 +143,7 @@ static ParseOptResult ParseOpt(int argc, char * argv[], int &parseIndex) {
     return FAIL;
   }
   if (opt[0] != '-') { // 选项必须以'-'开头
-    printf("option must begins with '-'\n");
+    printf("option must begins with '-', %s is invalid option\n", opt);
     return FAIL;
   }
   opt++; // 过滤第一个'-'
@@ -165,7 +165,7 @@ static ParseOptResult ParseOpt(int argc, char * argv[], int &parseIndex) {
     if (opt[i] == '=') {
       hasArgument = true;
       argument = std::string(opt + i + 1); // 取等号之后的内容赋值为argument
-      opt[i] = 0; // 这样opt执行的字符串就是=之前的内容。
+      opt[i] = 0; // 这样opt执行的字符串就是'='之前的内容。
       break;
     }
   }
